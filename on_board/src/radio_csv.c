@@ -95,7 +95,7 @@ int main() {
         {.name = "CRC fail", .address = {0x21}, .bitstoread = 16},
         {.name = "RX count", .address = {0x23}, .bitstoread = 16},
         {.name = "RX fail full", .address = {0x25}, .bitstoread = 8},
-        {.name = "RSSI", .address = {0x2A}, .bitstoread = 12},
+        // {.name = "RSSI", .address = {0x2A}, .bitstoread = 12},
     };
 
     unsigned char rx_buffer[READ_SIZE];
@@ -111,14 +111,13 @@ int main() {
     printf("Receiving at frequency %f MHz\n", rx_frequency);
 
     write_reg_names_to_file(stdout, loop_registers, REG_COUNT);
-   
+
     enable_raw_mode(); // set raw mode to listen for key presses to quit
 
     while(1){
-	printf("\x1b[0J");
-	write_reg_values_to_file(stdout, fd, loop_registers, REG_COUNT);
-        
-	if (kbhit()) {
+        printf("\x1b[0J");
+        write_reg_values_to_file(stdout, fd, loop_registers, REG_COUNT);
+        if (kbhit()) {
             char c = getchar();
             if (c == 'q') {
                 printf("\nQuitting loop.\n");
@@ -134,18 +133,18 @@ int main() {
     char filename[128];
 
     if (fgets(filename, sizeof(filename), stdin) != NULL) {
-	// Remove the trailing newline character
-	filename[strcspn(filename, "\n")] = 0;
+    // Remove the trailing newline character
+    filename[strcspn(filename, "\n")] = 0;
 
-	if (strlen(filename) > 0) {
-	    FILE *outfile = fopen(filename, "w");
+    if (strlen(filename) > 0) {
+        FILE *outfile = fopen(filename, "w");
 
-	    write_reg_names_to_file(outfile, loop_registers, REG_COUNT);
-	    write_reg_values_to_file(outfile, fd, loop_registers, REG_COUNT);
-	    fprintf(outfile, "\n");
+        write_reg_names_to_file(outfile, loop_registers, REG_COUNT);
+        write_reg_values_to_file(outfile, fd, loop_registers, REG_COUNT);
+        fprintf(outfile, "\n");
 
-	    fclose(outfile);
-	}
+        fclose(outfile);
+    }
     }
     close(fd);
     return 0;
