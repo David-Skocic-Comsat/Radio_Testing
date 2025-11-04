@@ -8,7 +8,7 @@
 #include "keylisten_helper.h"
 
 
-#define REG_COUNT 4
+#define REG_COUNT 3
 #define READ_SIZE 2
 #define MAX_NAME_LENGTH 24
 
@@ -16,7 +16,11 @@ typedef struct {
     char name[MAX_NAME_LENGTH];
     unsigned char address[1];
     unsigned int bitstoread;
+    unsigned int prevValue;
+    unsigned int totalSinceStart;
 } reg;
+
+int setup = 1;
 
 unsigned int convert_bytes_to_uint32(unsigned char *bytes, unsigned int bits_used){
     unsigned char mask = 0;
@@ -63,22 +67,51 @@ int write_reg_values_to_file(FILE *f, int i2c_fd, reg *regs, int reg_count){
     unsigned char rx_buffer[READ_SIZE];
 
     for (int i = 0; i < reg_count; i++) {
-	if (i2c_write_then_read(i2c_fd, regs[i].address, 1, rx_buffer, sizeof(rx_buffer)) < 0){
-	    return 1;
-	}
-	if (i > 0){
-	    fprintf(f, ", ");
-	}
-	unsigned int result = convert_bytes_to_uint32(rx_buffer, regs[i].bitstoread);
-	if (strcmp(regs[i].name, "RSSI") == 0){
-	    fprintf(f, "%f", result*3.0/4096);
-	} else {
-	    fprintf(f, "%d", result);
-	}
+        if (i2c_write_then_read(i2c_fd, regs[i].address, 1, rx_buffer, sizeof(rx_buffer)) < 0){
+            return 1;
+        }
+        if (i > 0){
+            fprintf(f, ", ");
+        }
+        unsigned int result = convert_bytes_to_uint32(rx_buffer, regs[i].bitstoread);
+
+        // write the values in each register to the file passed in
+        if (strcmp(regs[i].name, "RSSI") == 0){
+            fprintf(f, "%f", result*3.0/4096);
+        } else {
+            fprintf(f, "%d", result);
+        }
+
+        // update the value in the register struct
+        if (setup){
+            regs[i].prevValue = result;
+            setup = 0;
+        }
+        if (result > regs[i].prevValue){
+            regs[i].totalSinceStart += result - regs[i].prevValue;
+        } else if (result < regs[i].prevValue) {
+            regs[i].totalSinceStart += result + (65536 - regs[i].prevValue);
+        }
+        regs[i].prevValue = result;
     }
     fflush(f);
     return 0;
 }
+
+/*
+    formal test program to measure packet receive rates for radio.
+    Tests different parameters such as packet length, time between packets,
+    and packet content. 
+
+    this program is solely responsible for the receiving end of this, so it
+    reads over i2c the number of successfully received packets and the number that
+    fail crc that the radio reports. Others that are dropped will need their own
+    explanation.
+
+    for a given test, one will need to start this program, then start the packet sending
+    program, then terminate this program to get a single result once all packets have
+    been sent. This program will simply print how many packets were received
+*/
 
 int main() {
     const char *i2c_bus = "/dev/i2c-1";
@@ -90,11 +123,11 @@ int main() {
     if (fd < 0) return 1;
 
 
-    reg init_registers[] = {{.name = "RX Freqency", .address = {0x07}, .bitstoread = 11}};
+    reg init_registers[] = {{.name = "RX Freqency", .address = {0x07}, .bitstoread = 11, .prevValue = 0, .totalSinceStart = 0}};
     reg loop_registers[] = {
-        {.name = "CRC fail", .address = {0x21}, .bitstoread = 16},
-        {.name = "RX count", .address = {0x23}, .bitstoread = 16},
-        {.name = "RX fail full", .address = {0x25}, .bitstoread = 8},
+        {.name = "CRC fail", .address = {0x21}, .bitstoread = 16, .prevValue = 0, .totalSinceStart = 0},
+        {.name = "RX count", .address = {0x23}, .bitstoread = 16, .prevValue = 0, .totalSinceStart = 0},
+        {.name = "RX fail full", .address = {0x25}, .bitstoread = 8, .prevValue = 0, .totalSinceStart = 0},
         // {.name = "RSSI", .address = {0x2A}, .bitstoread = 12},
     };
 
@@ -128,6 +161,9 @@ int main() {
         usleep(250000);
     }
     disable_raw_mode(); // turn off raw mode
+    for (int i = 0; i < REG_COUNT; i++){
+        printf("%s: %d\n", loop_registers[i].name, loop_registers[i].totalSinceStart);
+    }
     printf("Enter filename to save these values to (empty to ignore): ");
 
     char filename[128];
