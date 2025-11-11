@@ -70,17 +70,7 @@ int write_reg_values_to_file(FILE *f, int i2c_fd, reg *regs, int reg_count){
         if (i2c_write_then_read(i2c_fd, regs[i].address, 1, rx_buffer, sizeof(rx_buffer)) < 0){
             return 1;
         }
-        if (i > 0){
-            fprintf(f, ", ");
-        }
         unsigned int result = convert_bytes_to_uint32(rx_buffer, regs[i].bitstoread);
-
-        // write the values in each register to the file passed in
-        if (strcmp(regs[i].name, "RSSI") == 0){
-            fprintf(f, "%f", result*3.0/4096);
-        } else {
-            fprintf(f, "%d", result);
-        }
 
         // update the value in the register struct
         if (setup){
@@ -92,6 +82,15 @@ int write_reg_values_to_file(FILE *f, int i2c_fd, reg *regs, int reg_count){
             regs[i].totalSinceStart += result + (65536 - regs[i].prevValue);
         }
         regs[i].prevValue = result;
+
+        if (i > 0){
+            fprintf(f, ", ");
+        }
+        // write the totals from each register to the file passed in
+        if (strcmp(regs[i].name, "RSSI") != 0){
+            fprintf(f, "%d", regs[i].totalSinceStart);
+        }
+
     }
     fflush(f);
     setup = 0;
