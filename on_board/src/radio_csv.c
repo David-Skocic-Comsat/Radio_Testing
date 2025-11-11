@@ -85,7 +85,6 @@ int write_reg_values_to_file(FILE *f, int i2c_fd, reg *regs, int reg_count){
         // update the value in the register struct
         if (setup){
             regs[i].prevValue = result;
-            setup = 0;
         }
         if (result > regs[i].prevValue){
             regs[i].totalSinceStart += result - regs[i].prevValue;
@@ -95,6 +94,7 @@ int write_reg_values_to_file(FILE *f, int i2c_fd, reg *regs, int reg_count){
         regs[i].prevValue = result;
     }
     fflush(f);
+    setup = 0;
     return 0;
 }
 
