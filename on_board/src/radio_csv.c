@@ -122,7 +122,10 @@ int main() {
     if (fd < 0) return 1;
 
 
-    reg init_registers[] = {{.name = "RX Freqency", .address = {0x07}, .bitstoread = 11, .prevValue = 0, .totalSinceStart = 0}};
+    reg init_registers[] = {
+        {.name = "RX Freqency", .address = {0x07}, .bitstoread = 11, .prevValue = 0, .totalSinceStart = 0},
+        {.name = "Modulation Type", .address = {0x00}, .bitstoread = 2, .prevValue = 0, .totalSinceStart = 0}
+    };
     reg loop_registers[] = {
         {.name = "CRC fail", .address = {0x21}, .bitstoread = 16, .prevValue = 0, .totalSinceStart = 0},
         {.name = "RX count", .address = {0x23}, .bitstoread = 16, .prevValue = 0, .totalSinceStart = 0},
@@ -139,8 +142,17 @@ int main() {
 
     float rx_frequency = convert_bytes_to_uint32(rx_buffer,11) * 12.5 / 1000 + 399.9;
 
+    if (i2c_write_then_read(fd, init_registers[1].address, 1, rx_buffer, sizeof(rx_buffer)) < 0){
+        close(fd);
+        return 1;
+    }
+
+    int modscheme = convert_bytes_to_uint32(rx_buffer, 2);
+
+
     printf("Press q to stop\n");
     printf("Receiving at frequency %f MHz\n", rx_frequency);
+    printf("Using modulation type %d (check data sheet)\n", modscheme);
 
     write_reg_names_to_file(stdout, loop_registers, REG_COUNT);
 
